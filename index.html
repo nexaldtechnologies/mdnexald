@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- Primary Meta Tags -->
+    <title>MD-NEXA – Medical ChatGPT for Doctors & Students | Guideline-Aware Study AI</title>
+    <meta name="description" content="MD-NEXA is an AI medical assistant for doctors and med students. Explain pathophysiology, compare diagnoses, and check drug suitability based on latest guidelines. Educational use only." />
+    <meta name="keywords" content="Medical AI, ChatGPT for Doctors, Medical Student AI, Clinical Guidelines, Pathophysiology, Differential Diagnosis, Drug Suitability, MDnexa" />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://mdnexa.ai/" />
+    <meta property="og:title" content="MD-NEXA – Medical ChatGPT for Doctors & Students" />
+    <meta property="og:description" content="MD-NEXA is an AI medical assistant for doctors and med students. Explain pathophysiology, compare diagnoses, and check drug suitability based on latest guidelines." />
+    <meta property="og:site_name" content="MDnexa™" />
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:title" content="MD-NEXA – Medical ChatGPT for Doctors & Students" />
+    <meta property="twitter:description" content="MD-NEXA is an AI medical assistant for doctors and med students. Explain pathophysiology, compare diagnoses, and check drug suitability based on latest guidelines." />
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+            },
+            colors: {
+              medical: {
+                50: '#F0F7FF',
+                100: '#E0EFFE',
+                200: '#B9DDFE',
+                300: '#7CBFFE',
+                400: '#369EFF',
+                500: '#0EA5E9', // Primary Brand
+                600: '#0284C7',
+                700: '#0369A1',
+                800: '#075985',
+                900: '#0C4A6E',
+              },
+              slate: {
+                850: '#151f2e', // Custom deep dark for sidebar
+              }
+            },
+            boxShadow: {
+              'subtle': '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+              'card': '0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.02)',
+              'floating': '0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025)',
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      /* Professional Font Smoothing */
+      body {
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      /* Custom scrollbar for chat container */
+      .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+      }
+      .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+      }
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 6px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background-color: #E2E8F0;
+        border-radius: 20px;
+      }
+      .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+        background-color: #334155;
+      }
+      
+      /* Animation for modal */
+      @keyframes fadeIn {
+        from { opacity: 0; transform: scale(0.98); }
+        to { opacity: 1; transform: scale(1); }
+      }
+      .animate-fade-in {
+        animation: fadeIn 0.2s ease-out forwards;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "uuid": "https://aistudiocdn.com/uuid@^13.0.0",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
