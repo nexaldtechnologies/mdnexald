@@ -19,7 +19,7 @@ const ForgotPasswordPage: React.FC = () => {
 
             // ...
 
-            const res = await apiFetch('/api/auth/request-password-reset', {
+            const res = await apiFetch('/auth/request-password-reset', {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email }),

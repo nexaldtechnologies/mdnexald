@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiRequest, apiFetch } from '../services/api';
 import { supabase } from '../services/supabaseClient';
+import { REGIONS_DATA, VOICE_LANGUAGES } from '../constants';
 
 
 interface SettingsModalProps {
@@ -82,12 +83,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
     // 2. Fetch from Backend (Source of Truth)
     try {
-      const data = await apiRequest('/api/users/me');
+      const data = await apiRequest('/users/me');
       setUserProfile(data);
 
       // Fetch subscription status
       try {
-        const { subscription } = await apiRequest('/api/subscriptions/status');
+        const { subscription } = await apiRequest('/subscriptions/status');
         setSubscription(subscription);
       } catch (subError) {
         console.log('No active subscription found or error fetching status');
@@ -100,7 +101,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const handleManageSubscription = async () => {
     setLoadingPortal(true);
     try {
-      const { url } = await apiRequest('/api/subscriptions/create-portal-session', 'POST');
+      const { url } = await apiRequest('/subscriptions/create-portal-session', 'POST');
       window.location.href = url;
     } catch (error) {
       console.error("Error creating portal session:", error);
@@ -138,7 +139,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         // ...
 
-        const res = await apiFetch('/api/auth/request-password-reset', {
+        const res = await apiFetch('/auth/request-password-reset', {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email }),
@@ -162,7 +163,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const handleDeactivate = async () => {
     if (window.confirm("Are you sure you want to deactivate your account? This will permanently delete your data and log you out immediately.")) {
       try {
-        await apiRequest('/api/users/delete-account', 'DELETE');
+        await apiRequest('/users/delete-account', 'DELETE');
         alert("Account deactivated successfully.");
         onLogout(); // Log out immediately
         onClose();

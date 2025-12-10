@@ -269,7 +269,7 @@ const App: React.FC = () => {
 
     try {
       // 2. Then fetch from backend to get the comprehensive Settings data (slower but source of truth)
-      const userData = await apiRequest('/api/users/me');
+      const userData = await apiRequest('/users/me');
 
       if (userData) {
         const name = userData.full_name || userData.email?.split('@')[0] || "Guest";
@@ -279,7 +279,7 @@ const App: React.FC = () => {
 
         // Fetch Subscription Status
         try {
-          const { subscription } = await apiRequest('/api/subscriptions/status');
+          const { subscription } = await apiRequest('/subscriptions/status');
           setSubscription(subscription);
         } catch (err) {
           console.log("No active subscription");
@@ -972,6 +972,8 @@ const App: React.FC = () => {
         }}
         language={language}
         setLanguage={setLanguage}
+        isShortAnswer={isShortAnswer}
+        setIsShortAnswer={setIsShortAnswer}
       />
 
       <DictionaryModal
@@ -984,17 +986,21 @@ const App: React.FC = () => {
       <ShareModal
         isOpen={isShareModalOpen}
         onClose={() => setIsShareModalOpen(false)}
-        data={shareData}
+        shareData={shareData}
       />
 
       {isGuestLimitModalOpen && (
         <GuestLimitModal
           isOpen={isGuestLimitModalOpen}
-          onClose={() => setIsGuestLimitModalOpen(false)}
           onLogin={() => {
             setIsGuestLimitModalOpen(false);
             setShowAuth(true);
             setAuthView('login');
+          }}
+          onSignup={() => {
+            setIsGuestLimitModalOpen(false);
+            setShowAuth(true);
+            setAuthView('signup');
           }}
         />
       )}

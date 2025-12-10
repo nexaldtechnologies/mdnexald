@@ -37,7 +37,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onBack, onSuccess, initialVi
 
     const validateReferral = async (code: string) => {
         try {
-            const data = await apiRequest(`/api/referrals/validate?code=${code}`);
+            const data = await apiRequest(`/referrals/validate?code=${code}`);
             if (data && data.valid) {
                 // Normalize for easier checking
                 if (!data.table && data.category) {
@@ -166,7 +166,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onBack, onSuccess, initialVi
                     if (referralData) {
                         try {
                             // This might fail if backend is down, but we don't want to block signup
-                            apiRequest('/api/referrals/track', 'POST', {
+                            apiRequest('/referrals/track', 'POST', {
                                 code: referralData.code,
                                 table: referralData.table
                             }).catch(err => console.warn("Referral tracking failed (backend likely offline):", err));

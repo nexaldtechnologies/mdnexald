@@ -157,7 +157,7 @@ export const streamChatResponse = async ({
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await apiFetch('/api/chat/message', {
+    const data = await apiFetch('/chat/message', {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -172,28 +172,16 @@ export const streamChatResponse = async ({
       signal
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
+    // apiFetch now throws on error, so manual !response.ok check is not needed.
+    // If we're here, it's successful.
 
-      // Handle Limit Reached specifically
-      if (response.status === 403 && errorData.error === 'LIMIT_REACHED') {
-        throw new Error(errorData.message);
-      }
+    // However, we might want to catch specific error codes if apiFetch attaches them.
+    // My implemented apiFetch sets (error as any).status.
 
-      // Handle 401 Session Expired - CRITICAL FIX
-      if (response.status === 401) {
-        console.warn('Session expired. Logging out...');
-        localStorage.removeItem('session'); // Just in case
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        window.location.href = '/auth';
-        throw new Error('Session expired. Please log in again.');
-      }
-
-      throw new Error(errorData.error || 'Failed to get response');
+    if (!data || !data.text) {
+      throw new Error('Invalid response format');
     }
 
-    const data = await response.json();
     const fullText = data.text;
 
     // Simulate streaming for UI compatibility
@@ -207,7 +195,7 @@ export const streamChatResponse = async ({
     console.error("DEBUG: Backend Chat API Error Details:", {
       message: error.message,
       stack: error.stack,
-      url: CHAT_API_URL
+      url: '/chat/message'
     });
     throw error;
   }

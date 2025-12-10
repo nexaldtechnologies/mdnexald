@@ -48,7 +48,7 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // Enable preflight for all routes
+app.options(/.*/, cors(corsOptions)); // Enable preflight for all routes
 app.use(express.json());
 app.use('/uploads', express.static('uploads')); // Serve uploaded images
 
@@ -65,6 +65,10 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok' });
 });
 
-app.listen(port, () => {
-    console.log(`Server running on port ${port}`);
-});
+if (require.main === module) {
+    app.listen(port, () => {
+        console.log(`Server running on port ${port}`);
+    });
+}
+
+module.exports = app;

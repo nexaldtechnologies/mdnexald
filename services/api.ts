@@ -1,40 +1,40 @@
 import { supabase } from './supabaseClient';
 
-export function getApiBaseUrl(): string {
-    // 1) Try env override (for tests / tools)
-    const fromEnv =
-        import.meta.env.VITE_API_BASE_URL ||
-        import.meta.env.VITE_BACKEND_URL ||
-        '';
+const API_BASE_PATH = '/api';
 
-    if (fromEnv) return fromEnv.replace(/\/$/, '');
-
-    // 2) Browser: use current origin (same domain as frontend)
-    if (typeof window !== 'undefined' && window.location.origin) {
-        return window.location.origin.replace(/\/$/, '');
-    }
-
-    // 3) Fallback for SSR / node: assume https://www.mdnexa.com
-    return 'https://www.mdnexa.com';
+export function buildApiUrl(path: string): string {
+    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    return `${API_BASE_PATH}${cleanPath}`;
 }
 
-export async function apiFetch(
+export async function apiFetch<T = any>(
     path: string,
     options: RequestInit = {}
-): Promise<Response> {
-    const base = getApiBaseUrl();
-    const url = path.startsWith('http')
-        ? path
-        : `${base}${path.startsWith('/') ? path : '/' + path}`;
-
-    return fetch(url, {
+): Promise<T> {
+    const url = buildApiUrl(path);
+    const res = await fetch(url, {
         ...options,
         headers: {
             'Content-Type': 'application/json',
             ...(options.headers || {}),
         },
-        credentials: 'include',
     });
+
+    if (!res.ok) {
+        let payload: any = null;
+        try { payload = await res.json(); } catch { }
+        const message = payload?.message || `API error ${res.status}`;
+        const error = new Error(message);
+        (error as any).status = res.status;
+        (error as any).code = payload?.error || payload?.code; // Preserve error code if present
+        throw error;
+    }
+
+    try {
+        return (await res.json()) as T;
+    } catch {
+        return null as T;
+    }
 }
 
 export async function apiRequest(
@@ -71,16 +71,9 @@ export async function apiRequest(
         }
 
         // Make the request using apiFetch
-        const response = await apiFetch(path, options);
+        // apiFetch returns T (the data) directly now.
+        return await apiFetch(path, options);
 
-        // Parse response
-        const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(data.error || `Request failed with status ${response.status}`);
-        }
-
-        return data;
     } catch (error) {
         console.error('API Request Error:', error);
         throw error;
