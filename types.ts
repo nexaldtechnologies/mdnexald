@@ -28,7 +28,8 @@ export interface GenerateStreamParams {
   region: string;
   country: string;
   userRole: string;
-  isShortAnswer?: boolean;
+  isShortAnswer: boolean;
+  language?: string;
   onChunk: (text: string) => void;
   signal?: AbortSignal;
 }

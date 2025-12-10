@@ -1,0 +1,412 @@
+
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../services/supabaseClient';
+import { apiRequest } from '../services/api';
+import { Logo } from './Logo';
+
+interface AuthPageProps {
+    onBack: () => void;
+    onSuccess: () => void;
+    initialView?: 'login' | 'signup';
+    pendingSubscriptionPriceId?: string;
+}
+
+export const AuthPage: React.FC<AuthPageProps> = ({ onBack, onSuccess, initialView = 'login', pendingSubscriptionPriceId }) => {
+    console.log('[FORGOT] Component mounted (AuthPage)');
+    const [view, setView] = useState<'login' | 'signup' | 'forgot-password'>(initialView);
+    const [name, setName] = useState('');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+    // Referral State
+    const [referralCode, setReferralCode] = useState<string | null>(null);
+    const [referralData, setReferralData] = useState<any>(null); // { valid, promo_code, discount_percent, table }
+
+    // Check for referral on mount
+    useEffect(() => {
+        console.log("AuthPage Mounted. View:", view);
+        const storedRef = localStorage.getItem('mdnexa_ref');
+        if (storedRef) {
+            setReferralCode(storedRef);
+            validateReferral(storedRef);
+        }
+    }, [view]);
+
+    const validateReferral = async (code: string) => {
+        try {
+            const data = await apiRequest(`/api/referrals/validate?code=${code}`);
+            if (data && data.valid) {
+                // Normalize for easier checking
+                if (!data.table && data.category) {
+                    // logical guess if table is missing, but usually API returns it. 
+                    // We will rely on category or API fix.
+                }
+                setReferralData(data);
+            } else {
+                // Invalid or inactive, ignore or clear? keeping quiet is usually better UX than erroring unless user typed it manually
+                console.log("Referral code invalid:", data?.message);
+                localStorage.removeItem('mdnexa_ref'); // Clear invalid code
+            }
+        } catch (err) {
+            console.error("Referral validation failed", err);
+        }
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setLoading(true);
+        setError(null);
+        setSuccessMessage(null);
+
+        // Forgot Password Flow
+        if (view === 'forgot-password') {
+            console.log('[FORGOT] submitting reset for', email);
+            try {
+                // Use window.location.origin to ensure correct environment (localhost vs prod)
+                const redirectUrl = `${window.location.origin}/reset-password`;
+
+                const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+                    redirectTo: redirectUrl,
+                });
+
+                console.log('[FORGOT] Supabase result', { data, error });
+
+                if (error) {
+                    console.error('[FORGOT] Error:', error);
+                    setError(error.message);
+                } else {
+                    console.log('[FORGOT] Success - link sent');
+                    setSuccessMessage('If an account exists for this email, a reset link has been sent.');
+                }
+            } catch (err: any) {
+                console.error('[FORGOT] Exception:', err);
+                setError(err.message || 'Failed to process request.');
+            } finally {
+                setLoading(false);
+            }
+            return;
+        }
+
+        const STRIPE_LINKS: Record<string, string> = {
+            'price_1SYuANFvNzuNoc9FLyLTf8ny': 'https://buy.stripe.com/14A9AT2BCfxj47Rdci5Ne06',
+            'price_1SYuB2FvNzuNoc9FjxK1LNyV': 'https://buy.stripe.com/00w5kDfoo3OB5bV4FM5Ne01'
+        };
+
+        // Pre-calculate target URL
+        let targetUrl: string | undefined;
+        if (view === 'login') {
+            if (pendingSubscriptionPriceId) {
+                targetUrl = STRIPE_LINKS[pendingSubscriptionPriceId];
+            }
+        } else {
+            // Check if this referral grants free access
+            const isFreeAccess = referralData && ['team_referrals', 'family_referrals', 'ambassador_referrals', 'ambassador', 'team', 'family'].includes(referralData.table || referralData.category);
+
+            if (isFreeAccess) {
+                // Bypass Stripe entirely
+                targetUrl = undefined;
+            } else {
+                // Standard User or % Discount
+                // Signup - default to monthly if no specific price selected
+                const priceIdToUse = pendingSubscriptionPriceId || 'price_1SYuANFvNzuNoc9FLyLTf8ny';
+                targetUrl = STRIPE_LINKS[priceIdToUse];
+
+                // Append Promo Code if valid referral exists
+                if (targetUrl && referralData?.promo_code) {
+                    targetUrl += `?prefilled_promo_code=${referralData.promo_code}`;
+                }
+            }
+        }
+
+        try {
+            if (view === 'login') {
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email,
+                    password,
+                });
+                if (error) throw error;
+
+                // Sync token explicitly
+                if (data.session) {
+                    localStorage.setItem('token', data.session.access_token);
+                    localStorage.setItem('user', JSON.stringify(data.session.user));
+                }
+
+                // Redirect to Stripe if needed
+                if (targetUrl) {
+                    window.location.href = targetUrl;
+                    return;
+                }
+
+                onSuccess();
+
+            } else {
+
+                // Use Backend Signup implementation to ensure Auto-Confirm works
+                // (Client-side signUp respects project settings which might enforce email confirm)
+                try {
+                    console.log("Attempting backend signup...");
+                    const signupResponse = await apiRequest('/api/auth/signup', 'POST', {
+                        email,
+                        password,
+                        data: {
+                            full_name: name,
+                            ref_source: referralCode || undefined,
+                        }
+                    });
+
+                    // Backend returns { success: true, user: ... } or throws error
+                    console.log("Backend signup success:", signupResponse);
+
+                } catch (signupErr: any) {
+                    console.error("Backend signup failed:", signupErr);
+                    throw new Error(signupErr.message || "Signup failed");
+                }
+
+                // Initial "data" variable mock for compatibility with below logic
+                // We don't get a session from admin.createUser, so data.session is null
+                const data = { session: null, user: { email } };
+
+                // Track Usage if referral was valid
+
+                // Track Usage if referral was valid
+                if (referralData) {
+                    try {
+                        await apiRequest('/api/referrals/track', 'POST', {
+                            code: referralData.code,
+                            table: referralData.table
+                        });
+                    } catch (trackErr) {
+                        console.error("Failed to track referral usage", trackErr);
+                    }
+                }
+
+                // Clear ref after successful signup attempt
+                localStorage.removeItem('mdnexa_ref');
+
+                const session = data.session;
+                const user = data.user;
+
+                // Handle Email Verification Case (Supabase returns User but NO Session)
+                // Handle case where session might be missing but user is created (and email confirm is off)
+                if (user && !session) {
+                    // Attempt immediate login since email confirmation is disabled
+                    console.log("Signup successful but no session. Attempting auto-login...");
+                    const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+                        email,
+                        password
+                    });
+
+                    if (loginData.session) {
+                        // Success! Use this session
+                        localStorage.setItem('token', loginData.session.access_token);
+                        localStorage.setItem('user', JSON.stringify(loginData.session.user));
+
+                        if (targetUrl) {
+                            window.location.href = targetUrl;
+                            return;
+                        }
+                        onSuccess();
+                        return;
+                    } else {
+                        // Real failure or actually waiting for email (if user was wrong about setting)
+                        console.warn("Auto-login failed:", loginError);
+                        setSuccessMessage("Account created. Please log in.");
+                        setLoading(false);
+                        return;
+                    }
+                }
+
+                if (session) {
+                    // Sync token for API usage
+                    localStorage.setItem('token', session.access_token);
+                    localStorage.setItem('user', JSON.stringify(session.user));
+
+                    if (targetUrl) {
+                        window.location.href = targetUrl;
+                        return;
+                    }
+                    onSuccess();
+                } else {
+                    // Fallback for edge cases
+                    setSuccessMessage("Account created. Please log in.");
+                }
+            }
+        } catch (err: any) {
+            console.error("Auth error:", err);
+            // Improving error visibility
+            let msg = err.message || 'An error occurred during authentication.';
+            if (msg.includes("Invalid login credentials")) {
+                msg = "Invalid email or password.";
+            } else if (msg.includes("Email not confirmed")) {
+                msg = "Email not confirmed. Check your inbox or spam.";
+            }
+            setError(msg);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[60] bg-white dark:bg-[#0B1120] flex flex-col items-center justify-center p-4">
+            {/* Header / Back */}
+            <button
+                onClick={onBack}
+                className="absolute top-6 left-6 p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                </svg>
+            </button>
+
+            <div className="w-full max-w-md">
+                <div className="text-center mb-10">
+                    <div className="w-16 h-16 mx-auto mb-4 text-medical-600">
+                        <Logo className="w-full h-full" />
+                    </div>
+                    <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
+                        {view === 'login' ? 'Welcome Back' : view === 'signup' ? 'Create Account' : 'Reset Password'}
+                    </h2>
+                    <p className="text-slate-500 dark:text-slate-400">
+                        {view === 'login'
+                            ? 'Enter your credentials to access your account'
+                            : view === 'signup'
+                                ? 'Sign up to start your medical AI journey'
+                                : 'Enter your email to receive a reset link'}
+                    </p>
+
+                    {/* Startup/Referral Badge */}
+                    {view === 'signup' && referralData && (
+                        <div className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-sm font-medium border border-green-200 dark:border-green-800 animate-fade-in-up">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
+                            </svg>
+                            {referralData.category && ['team_referrals', 'family_referrals', 'ambassador_referrals', 'ambassador', 'team', 'family'].includes(referralData.table || referralData.category)
+                                ? 'Unlimited Access Unlocked (Free)'
+                                : `${referralData.category ? referralData.category + ' ' : ''}Referral Applied: ${referralData.discount_percent}% Off`
+                            }
+                        </div>
+                    )}
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-4" target="_self">
+                    {error && (
+                        <div className="p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-300 text-sm">
+                            {error}
+                        </div>
+                    )}
+                    {successMessage && (
+                        <div className="p-3 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg text-green-600 dark:text-green-300 text-sm">
+                            {successMessage}
+                        </div>
+                    )}
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Email Address</label>
+                        <input
+                            type="email"
+                            required
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value.trim())}
+                            className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-medical-500/20 focus:border-medical-500 transition-all text-slate-900 dark:text-white"
+                            placeholder="doctor@hospital.com"
+                        />
+                    </div>
+
+                    {view === 'signup' && (
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Referral Code (Optional)</label>
+                            <input
+                                type="text"
+                                value={referralCode || ''}
+                                onChange={(e) => {
+                                    const val = e.target.value.trim();
+                                    setReferralCode(val);
+                                    if (val.length > 2) {
+                                        validateReferral(val);
+                                    } else {
+                                        setReferralData(null);
+                                    }
+                                }}
+                                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-medical-500/20 focus:border-medical-500 transition-all text-slate-900 dark:text-white"
+                                placeholder="Have a code?"
+                            />
+                        </div>
+                    )}
+
+                    {view !== 'forgot-password' && (
+                        <div>
+                            <div className="flex justify-between items-center mb-1.5">
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Password</label>
+                                {view === 'login' && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            window.history.pushState({}, '', '/forgot-password');
+                                            window.dispatchEvent(new PopStateEvent('popstate'));
+                                        }}
+                                        className="text-xs font-semibold text-medical-600 dark:text-medical-400 hover:underline"
+                                    >
+                                        Forgot password?
+                                    </button>
+                                )}
+                            </div>
+                            <input
+                                type="password"
+                                required
+                                minLength={6}
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-medical-500/20 focus:border-medical-500 transition-all text-slate-900 dark:text-white"
+                                placeholder="••••••••"
+                            />
+                        </div>
+                    )}
+
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full py-3.5 bg-medical-600 hover:bg-medical-700 text-white font-bold rounded-xl shadow-lg shadow-medical-600/20 transition-all transform hover:-translate-y-0.5 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none"
+                    >
+                        {loading ? (
+                            <div className="flex items-center justify-center gap-2">
+                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                Processing...
+                            </div>
+                        ) : (
+                            view === 'login' ? 'Log In' : view === 'signup' ? 'Sign Up' : 'Send Reset Link'
+                        )}
+                    </button>
+                </form>
+
+                <div className="mt-8 text-center">
+                    {view === 'forgot-password' ? (
+                        <button
+                            onClick={() => { setView('login'); setError(null); setSuccessMessage(null); }}
+                            className="text-slate-600 dark:text-slate-400 font-semibold hover:text-medical-600 dark:hover:text-medical-400 transition-colors"
+                        >
+                            Back to Login
+                        </button>
+                    ) : (
+                        <p className="text-slate-600 dark:text-slate-400">
+                            {view === 'login' ? "Don't have an account? " : "Already have an account? "}
+                            <button
+                                onClick={() => {
+                                    setView(view === 'login' ? 'signup' : 'login');
+                                    setError(null);
+                                    setSuccessMessage(null);
+                                }}
+                                className="text-medical-600 dark:text-medical-400 font-semibold hover:underline"
+                            >
+                                {view === 'login' ? 'Sign up' : 'Log in'}
+                            </button>
+                        </p>
+                    )}
+                </div>
+            </div >
+        </div >
+    );
+};
