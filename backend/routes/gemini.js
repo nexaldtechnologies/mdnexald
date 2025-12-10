@@ -2,8 +2,18 @@ const express = require('express');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const router = express.Router();
 
-// Initialize Gemini
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// Lazy Init Gemini
+let _genAI = null;
+const getGenAI = () => {
+    if (!_genAI) {
+        if (!process.env.GEMINI_API_KEY) {
+            console.error('[GEMINI_ERROR] Missing GEMINI_API_KEY');
+            throw new Error('Server misconfiguration: Missing AI Key');
+        }
+        _genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    }
+    return _genAI;
+};
 
 // Helper for Audio Decoding (if needed, but here we process text-to-speech)
 // Text-to-Speech Endpoint
@@ -17,27 +27,9 @@ router.post('/speech', async (req, res) => {
 
         // Retrieve model
         // Note: 'gemini-2.5-flash-preview-tts' might be a specific model name, using fallback if env not set
-        // But usually we just use the string literal if we are sure.
-        // User code used: "gemini-2.5-flash-preview-tts"
-        const model = genAI.getGenerativeModel({
-            model: "gemini-2.0-flash-exp", // Updated to a known working model for audio or keep user's if valid.
-            // User's code said "gemini-2.5-flash-preview-tts". I will stick to what they had or "gemini-2.0-flash-exp" if 2.5 is not public.
-            // Actually 2.5 isn't standard yet? Maybe they meant 1.5?
-            // Let's use the exact string they had in geminiService.ts to avoid breaking their intent, 
-            // BUT `gemini-2.5` doesn't exist publicly yet. Maybe they meant 1.5-flash?
-            // Or maybe they have access to preview. I will use a safe default or their string.
-            // Their string: 'gemini-2.5-flash-preview-tts'
-            // I'll trust them, but handle error.
+        const model = getGenAI().getGenerativeModel({
+            model: "gemini-2.0-flash-exp",
         });
-
-        // Wait, the SDK `generateContent` with `responseModalities: [Modality.AUDIO]` is new.
-        // If the model supports it.
-        // Let's assume their code worked client-side locally?
-        // Actually, they had issues.
-        // I will use a standard model config.
-
-        // REPLICATING THEIR CLIENT CODE EXACTLY (but server-side):
-        // model: "gemini-2.5-flash-preview-tts"
 
         const response = await model.generateContent({
             contents: [{ parts: [{ text: safeText }] }],
@@ -67,7 +59,7 @@ router.post('/transcribe', async (req, res) => {
         const { audioBase64, mimeType, languageCode } = req.body;
         if (!audioBase64) return res.status(400).json({ error: 'Audio data required' });
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' }); // Or 1.5-flash
+        const model = getGenAI().getGenerativeModel({ model: 'gemini-2.0-flash' }); // Or 1.5-flash
 
         const result = await model.generateContent({
             contents: [
@@ -100,7 +92,7 @@ router.post('/transcribe', async (req, res) => {
 router.post('/lookup', async (req, res) => {
     try {
         const { term, region, language } = req.body;
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const model = getGenAI().getGenerativeModel({ model: 'gemini-2.0-flash' });
 
         const result = await model.generateContent({
             contents: [{
@@ -140,7 +132,7 @@ router.post('/lookup', async (req, res) => {
 router.post('/related', async (req, res) => {
     try {
         const { lastMessage, lastResponse, userRole, language } = req.body;
-        const model = genAI.getGenerativeModel({
+        const model = getGenAI().getGenerativeModel({
             model: 'gemini-2.0-flash',
             generationConfig: { responseMimeType: 'application/json' }
         });
