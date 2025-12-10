@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import API_BASE_URL from '../config/api';
 import { REGIONS_DATA, VOICE_LANGUAGES } from '../constants';
 import { apiRequest } from '../services/api';
 import { supabase } from '../services/supabaseClient';
@@ -133,7 +134,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       }
 
       if (confirm(`Send password reset email to ${email}?`)) {
-        const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/auth/request-password-reset`, {
+
+
+        // ...
+
+        const res = await fetch(`${API_BASE_URL}/api/auth/request-password-reset`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email }),

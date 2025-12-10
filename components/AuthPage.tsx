@@ -146,94 +146,64 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onBack, onSuccess, initialVi
 
             } else {
 
-                // Use Backend Signup implementation to ensure Auto-Confirm works
-                // (Client-side signUp respects project settings which might enforce email confirm)
+                // Use Supabase Direct Signup
                 try {
-                    console.log("Attempting backend signup...");
-                    const signupResponse = await apiRequest('/api/auth/signup', 'POST', {
+                    console.log("Attempting Supabase signup...");
+                    const { data: authData, error: authError } = await supabase.auth.signUp({
                         email,
                         password,
-                        data: {
-                            full_name: name,
-                            ref_source: referralCode || undefined,
+                        options: {
+                            data: {
+                                full_name: name,
+                                ref_source: referralCode || undefined,
+                            }
                         }
                     });
 
-                    // Backend returns { success: true, user: ... } or throws error
-                    console.log("Backend signup success:", signupResponse);
+                    if (authError) throw authError;
 
-                } catch (signupErr: any) {
-                    console.error("Backend signup failed:", signupErr);
-                    throw new Error(signupErr.message || "Signup failed");
-                }
-
-                // Initial "data" variable mock for compatibility with below logic
-                // We don't get a session from admin.createUser, so data.session is null
-                const data = { session: null, user: { email } };
-
-                // Track Usage if referral was valid
-
-                // Track Usage if referral was valid
-                if (referralData) {
-                    try {
-                        await apiRequest('/api/referrals/track', 'POST', {
-                            code: referralData.code,
-                            table: referralData.table
-                        });
-                    } catch (trackErr) {
-                        console.error("Failed to track referral usage", trackErr);
+                    // Track Usage if referral was valid (Best effort, ignore if backend unreachable)
+                    if (referralData) {
+                        try {
+                            // This might fail if backend is down, but we don't want to block signup
+                            apiRequest('/api/referrals/track', 'POST', {
+                                code: referralData.code,
+                                table: referralData.table
+                            }).catch(err => console.warn("Referral tracking failed (backend likely offline):", err));
+                        } catch (trackErr) {
+                            console.warn("Referral tracking setup failed", trackErr);
+                        }
                     }
-                }
 
-                // Clear ref after successful signup attempt
-                localStorage.removeItem('mdnexa_ref');
+                    // Clear ref after successful signup attempt
+                    localStorage.removeItem('mdnexa_ref');
 
-                const session = data.session;
-                const user = data.user;
+                    const session = authData.session;
+                    const user = authData.user;
 
-                // Handle Email Verification Case (Supabase returns User but NO Session)
-                // Handle case where session might be missing but user is created (and email confirm is off)
-                if (user && !session) {
-                    // Attempt immediate login since email confirmation is disabled
-                    console.log("Signup successful but no session. Attempting auto-login...");
-                    const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
-                        email,
-                        password
-                    });
-
-                    if (loginData.session) {
-                        // Success! Use this session
-                        localStorage.setItem('token', loginData.session.access_token);
-                        localStorage.setItem('user', JSON.stringify(loginData.session.user));
+                    if (session) {
+                        // Success - Auto Confirmed or Session provided
+                        localStorage.setItem('token', session.access_token);
+                        localStorage.setItem('user', JSON.stringify(session.user));
 
                         if (targetUrl) {
                             window.location.href = targetUrl;
                             return;
                         }
                         onSuccess();
-                        return;
+                    } else if (user) {
+                        // User created but no session -> Email confirmation likely required
+                        console.log("User created, waiting for email confirmation.");
+                        setSuccessMessage("Account created! Please check your email to confirm your account.");
+
+                        // Optional: Could attempt auto-login just in case, but usually if no session, it's strictly because of confirm
                     } else {
-                        // Real failure or actually waiting for email (if user was wrong about setting)
-                        console.warn("Auto-login failed:", loginError);
-                        setSuccessMessage("Account created. Please log in.");
-                        setLoading(false);
-                        return;
+                        throw new Error("Signup successful but no user returned.");
                     }
-                }
 
-                if (session) {
-                    // Sync token for API usage
-                    localStorage.setItem('token', session.access_token);
-                    localStorage.setItem('user', JSON.stringify(session.user));
-
-                    if (targetUrl) {
-                        window.location.href = targetUrl;
-                        return;
-                    }
-                    onSuccess();
-                } else {
-                    // Fallback for edge cases
-                    setSuccessMessage("Account created. Please log in.");
+                } catch (signupErr: any) {
+                    console.error("Signup failed:", signupErr);
+                    throw new Error(signupErr.message || "Signup failed");
                 }
             }
         } catch (err: any) {

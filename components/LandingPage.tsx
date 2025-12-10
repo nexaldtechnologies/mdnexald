@@ -1,8 +1,8 @@
 
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Logo } from './Logo';
-import { apiRequest } from '../services/api';
+
 
 import { FloatingBackground } from './FloatingBackground';
 
@@ -19,8 +19,7 @@ interface LandingPageProps {
   onToggleTheme: () => void;
   isAuthenticated: boolean;
   userName?: string;
-  isAuthenticated: boolean;
-  userName?: string;
+
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({
@@ -37,32 +36,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   isAuthenticated,
   userName = 'User'
 }) => {
-  const [email, setEmail] = useState('');
-  const [name, setName] = useState('');
-  const [submitted, setSubmitted] = useState(false);
-  const [loading, setLoading] = useState(false);
 
-  const handleWaitlistSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) return;
-    setLoading(true);
-
-    try {
-      await apiRequest('/api/crm/leads', 'POST', {
-        email,
-        name,
-        source: 'landing_page_waitlist'
-      });
-      setSubmitted(true);
-      setEmail('');
-      setName('');
-    } catch (err) {
-      console.error("Waitlist failed", err);
-      alert("Something went wrong. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-950 text-slate-800 dark:text-white font-sans selection:bg-medical-100 dark:selection:bg-medical-900">
@@ -167,48 +141,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </button>
           </div>
 
-          {/* Waitlist Section */}
-          <div className="max-w-md mx-auto bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-lg">
-            {!submitted ? (
-              <form onSubmit={handleWaitlistSubmit} className="space-y-4">
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Join the Waitlist</h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Get early access to new features and updates.</p>
 
-                <input
-                  type="text"
-                  placeholder="Your Name (Optional)"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-medical-500"
-                />
-                <input
-                  type="email"
-                  placeholder="Enter your email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-medical-500"
-                />
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
-                >
-                  {loading ? 'Joining...' : 'Join Waitlist'}
-                </button>
-              </form>
-            ) : (
-              <div className="text-center py-8">
-                <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center text-green-600 dark:text-green-400 mx-auto mb-3">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-6 h-6">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white">You're on the list!</h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400">We'll be in touch soon.</p>
-              </div>
-            )}
-          </div>
         </div>
       </header>
 

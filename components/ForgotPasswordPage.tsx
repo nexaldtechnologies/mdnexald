@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { supabase } from "../services/supabaseClient";
 import { Logo } from "./Logo";
+import API_BASE_URL from '../config/api';
 
 const ForgotPasswordPage: React.FC = () => {
     const [email, setEmail] = useState("");
@@ -14,7 +15,11 @@ const ForgotPasswordPage: React.FC = () => {
         setErrorMessage(null);
 
         try {
-            const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/auth/request-password-reset`, {
+
+
+            // ...
+
+            const res = await fetch(`${API_BASE_URL}/api/auth/request-password-reset`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email }),

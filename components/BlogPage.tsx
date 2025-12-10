@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import API_BASE_URL from '../config/api';
 import { Logo } from './Logo';
 import { apiRequest } from '../services/api';
 import ReactMarkdown from 'react-markdown';
@@ -47,7 +48,7 @@ export const BlogPage: React.FC<BlogPageProps> = ({ onBack, onStart, isAuthentic
             // apiRequest usually adds token if available. If endpoint is public, it ignores it.
             // Let's assume standard fetch for public if apiRequest fails without token (though apiRequest handles optional auth often)
             // But to be safe for unauthed users, let's use standard fetch if not authed, or just standard fetch always for public route
-            const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/blogs`);
+            const res = await fetch(`${API_BASE_URL}/api/blogs`);
             const data = await res.json();
             if (Array.isArray(data)) {
                 setBlogs(data);
@@ -77,7 +78,7 @@ export const BlogPage: React.FC<BlogPageProps> = ({ onBack, onStart, isAuthentic
 
             // Using fetch directly for FormData to avoid Content-Type header issues with JSON helpers causes
             const token = localStorage.getItem('token');
-            const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/blogs`, {
+            const res = await fetch(`${API_BASE_URL}/api/blogs`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`
@@ -228,7 +229,7 @@ export const BlogPage: React.FC<BlogPageProps> = ({ onBack, onStart, isAuthentic
                         {filteredBlogs.map(blog => {
                             // Fix image URL if it's a relative path from uploads
                             const displayImage = blog.image_url?.startsWith('/')
-                                ? `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${blog.image_url}`
+                                ? `${API_BASE_URL}${blog.image_url}`
                                 : blog.image_url;
 
                             return (

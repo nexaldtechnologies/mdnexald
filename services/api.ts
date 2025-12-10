@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import API_BASE_URL from '../config/api';
 
 export async function apiRequest(
     path: string,
@@ -35,7 +36,7 @@ export async function apiRequest(
 
         // Make the request
         const response = await fetch(
-            `${import.meta.env.VITE_BACKEND_URL}${path}`,
+            `${API_BASE_URL}${path}`,
             options
         );
 

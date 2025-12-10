@@ -131,6 +131,8 @@ export const lookupMedicalTerm = async (term: string, region: string = 'Internat
   }
 };
 
+import { CHAT_API_URL } from "../config/api";
+
 // Replaced client-side streaming with Backend API call to enforce limits
 export const streamChatResponse = async ({
   history,
@@ -155,7 +157,7 @@ export const streamChatResponse = async ({
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/chat/message`, {
+    const response = await fetch(CHAT_API_URL, {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -205,7 +207,7 @@ export const streamChatResponse = async ({
     console.error("DEBUG: Backend Chat API Error Details:", {
       message: error.message,
       stack: error.stack,
-      url: `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/chat/message`
+      url: CHAT_API_URL
     });
     throw error;
   }
