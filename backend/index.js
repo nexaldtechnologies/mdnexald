@@ -20,7 +20,35 @@ const port = process.env.PORT || 3000;
 // Mount webhooks BEFORE express.json()
 app.use('/api/webhooks', webhooksRoutes);
 
-app.use(cors());
+// CORS Configuration
+const allowedOrigins = [
+    process.env.FRONTEND_URL,
+    process.env.FRONTEND_URL_ALT,
+    "http://localhost:5173", // Always allow local Vite dev
+    "http://localhost:3000"  // Always allow local backend access if needed
+].filter(Boolean);
+
+const corsOptions = {
+    origin: (origin, callback) => {
+        if (!origin) return callback(null, true); // Allow non-browser clients (e.g. server-to-server)
+
+        if (
+            allowedOrigins.includes(origin) ||
+            origin.startsWith("https://nexaldtechnologies-mdnexald-") // Allow Vercel previews
+        ) {
+            return callback(null, true);
+        }
+
+        console.warn(`CORS blocked origin: ${origin}`); // Helpful for debugging
+        return callback(new Error("Not allowed by CORS"));
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // Enable preflight for all routes
 app.use(express.json());
 app.use('/uploads', express.static('uploads')); // Serve uploaded images
 
