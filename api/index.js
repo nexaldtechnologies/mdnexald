@@ -1,3 +1,4 @@
-const app = require('../backend/index');
+// Use ESM syntax because root package.json is "type": "module"
+import app from '../backend/index.js';
 
-module.exports = app;
+export default app;
