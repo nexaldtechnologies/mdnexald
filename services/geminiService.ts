@@ -131,7 +131,7 @@ export const lookupMedicalTerm = async (term: string, region: string = 'Internat
   }
 };
 
-import { CHAT_API_URL } from "../config/api";
+import { apiFetch } from "./api";
 
 // Replaced client-side streaming with Backend API call to enforce limits
 export const streamChatResponse = async ({
@@ -157,7 +157,7 @@ export const streamChatResponse = async ({
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(CHAT_API_URL, {
+    const response = await apiFetch('/api/chat/message', {
       method: 'POST',
       headers,
       body: JSON.stringify({

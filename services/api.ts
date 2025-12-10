@@ -1,5 +1,41 @@
 import { supabase } from './supabaseClient';
-import API_BASE_URL from '../config/api';
+
+export function getApiBaseUrl(): string {
+    // 1) Try env override (for tests / tools)
+    const fromEnv =
+        import.meta.env.VITE_API_BASE_URL ||
+        import.meta.env.VITE_BACKEND_URL ||
+        '';
+
+    if (fromEnv) return fromEnv.replace(/\/$/, '');
+
+    // 2) Browser: use current origin (same domain as frontend)
+    if (typeof window !== 'undefined' && window.location.origin) {
+        return window.location.origin.replace(/\/$/, '');
+    }
+
+    // 3) Fallback for SSR / node: assume https://www.mdnexa.com
+    return 'https://www.mdnexa.com';
+}
+
+export async function apiFetch(
+    path: string,
+    options: RequestInit = {}
+): Promise<Response> {
+    const base = getApiBaseUrl();
+    const url = path.startsWith('http')
+        ? path
+        : `${base}${path.startsWith('/') ? path : '/' + path}`;
+
+    return fetch(url, {
+        ...options,
+        headers: {
+            'Content-Type': 'application/json',
+            ...(options.headers || {}),
+        },
+        credentials: 'include',
+    });
+}
 
 export async function apiRequest(
     path: string,
@@ -34,11 +70,8 @@ export async function apiRequest(
             options.body = JSON.stringify(body);
         }
 
-        // Make the request
-        const response = await fetch(
-            `${API_BASE_URL}${path}`,
-            options
-        );
+        // Make the request using apiFetch
+        const response = await apiFetch(path, options);
 
         // Parse response
         const data = await response.json();

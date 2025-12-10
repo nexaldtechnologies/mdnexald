@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import API_BASE_URL from '../config/api';
 import { Logo } from './Logo';
-import { apiRequest } from '../services/api';
+import { apiRequest, apiFetch, getApiBaseUrl } from '../services/api';
 import ReactMarkdown from 'react-markdown';
 
 interface BlogPageProps {
@@ -48,7 +47,7 @@ export const BlogPage: React.FC<BlogPageProps> = ({ onBack, onStart, isAuthentic
             // apiRequest usually adds token if available. If endpoint is public, it ignores it.
             // Let's assume standard fetch for public if apiRequest fails without token (though apiRequest handles optional auth often)
             // But to be safe for unauthed users, let's use standard fetch if not authed, or just standard fetch always for public route
-            const res = await fetch(`${API_BASE_URL}/api/blogs`);
+            const res = await apiFetch('/api/blogs');
             const data = await res.json();
             if (Array.isArray(data)) {
                 setBlogs(data);
@@ -78,10 +77,11 @@ export const BlogPage: React.FC<BlogPageProps> = ({ onBack, onStart, isAuthentic
 
             // Using fetch directly for FormData to avoid Content-Type header issues with JSON helpers causes
             const token = localStorage.getItem('token');
-            const res = await fetch(`${API_BASE_URL}/api/blogs`, {
+            const res = await apiFetch('/api/blogs', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`
+                    // Content-Type is purposely undefined to let browser set boundary for FormData
                 },
                 body: formData
             });
@@ -229,7 +229,7 @@ export const BlogPage: React.FC<BlogPageProps> = ({ onBack, onStart, isAuthentic
                         {filteredBlogs.map(blog => {
                             // Fix image URL if it's a relative path from uploads
                             const displayImage = blog.image_url?.startsWith('/')
-                                ? `${API_BASE_URL}${blog.image_url}`
+                                ? `${getApiBaseUrl()}${blog.image_url}`
                                 : blog.image_url;
 
                             return (

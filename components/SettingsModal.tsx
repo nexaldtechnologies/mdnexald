@@ -1,8 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import API_BASE_URL from '../config/api';
-import { REGIONS_DATA, VOICE_LANGUAGES } from '../constants';
-import { apiRequest } from '../services/api';
+import { apiRequest, apiFetch } from '../services/api';
 import { supabase } from '../services/supabaseClient';
 
 
@@ -138,7 +136,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         // ...
 
-        const res = await fetch(`${API_BASE_URL}/api/auth/request-password-reset`, {
+        // ...
+
+        const res = await apiFetch('/api/auth/request-password-reset', {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email }),

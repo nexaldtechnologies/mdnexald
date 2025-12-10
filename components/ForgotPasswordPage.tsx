@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { supabase } from "../services/supabaseClient";
 import { Logo } from "./Logo";
-import API_BASE_URL from '../config/api';
+import { apiFetch } from "../services/api";
 
 const ForgotPasswordPage: React.FC = () => {
     const [email, setEmail] = useState("");
@@ -19,7 +19,7 @@ const ForgotPasswordPage: React.FC = () => {
 
             // ...
 
-            const res = await fetch(`${API_BASE_URL}/api/auth/request-password-reset`, {
+            const res = await apiFetch('/api/auth/request-password-reset', {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email }),
