@@ -67,9 +67,12 @@ router.post('/message', async (req, res) => {
                 // For now, let's log and proceed as "User" but check limits carefully.
             }
 
-            const isUnlimited = profile ? hasUnlimitedAccess(profile) : false;
+            const isUnlimited = hasUnlimitedAccess({
+                ...profile,
+                role: profile?.role || user.user_metadata?.role || 'user'
+            });
 
-            console.log(`[CHAT_ACCESS] User: ${user.email}, Role: ${profile?.role}, Sub: ${profile?.subscription_status}, Unlimited: ${isUnlimited}`);
+            console.log(`[CHAT_ACCESS] User: ${user.email}, Role: ${profile?.role || user.user_metadata?.role}, Unlimited: ${isUnlimited}`);
 
             if (!isUnlimited) {
                 // Check usage
