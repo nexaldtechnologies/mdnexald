@@ -8,7 +8,7 @@ const router = express.Router();
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // Default model - User Requested 2.5 Flash
-const CHAT_MODEL = process.env.MODEL_NAME || 'gemini-2.5-flash';
+const CHAT_MODEL = process.env.MODEL_NAME || 'gemini-2.0-flash-exp';
 
 // DEBUG: Check if we can access the question_usage table
 router.get('/debug', async (req, res) => {

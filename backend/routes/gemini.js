@@ -59,7 +59,7 @@ router.post('/transcribe', async (req, res) => {
         const { audioBase64, mimeType, languageCode } = req.body;
         if (!audioBase64) return res.status(400).json({ error: 'Audio data required' });
 
-        const model = getGenAI().getGenerativeModel({ model: 'gemini-2.0-flash' }); // Or 1.5-flash
+        const model = getGenAI().getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
 
         const result = await model.generateContent({
             contents: [
@@ -92,7 +92,7 @@ router.post('/transcribe', async (req, res) => {
 router.post('/lookup', async (req, res) => {
     try {
         const { term, region, language } = req.body;
-        const model = getGenAI().getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const model = getGenAI().getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
 
         const result = await model.generateContent({
             contents: [{
@@ -133,7 +133,7 @@ router.post('/related', async (req, res) => {
     try {
         const { lastMessage, lastResponse, userRole, language } = req.body;
         const model = getGenAI().getGenerativeModel({
-            model: 'gemini-2.0-flash',
+            model: 'gemini-2.0-flash-exp',
             generationConfig: { responseMimeType: 'application/json' }
         });
 
