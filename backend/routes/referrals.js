@@ -1,5 +1,6 @@
 const express = require('express');
 const supabase = require('../utils/supabase');
+const { requireAuth } = require('./auth');
 const router = express.Router();
 
 const REFERRAL_TABLES = [
@@ -68,8 +69,9 @@ router.get('/validate', async (req, res) => {
 });
 
 // POST /api/referrals/track
-router.post('/track', async (req, res) => {
+router.post('/track', requireAuth, async (req, res) => {
     const { code, table } = req.body;
+    const userId = req.user.id;
 
     if (!code || !table) {
         return res.status(400).json({ error: 'Code and table are required' });
@@ -81,18 +83,10 @@ router.post('/track', async (req, res) => {
     }
 
     try {
-        // Increment used_count
-        // We can do this safely via RPC if exists, or read-modify-write. 
-        // Read-modify-write is susceptible to race conditions but acceptable for this scale.
-        // Better: supabase.rpc('increment_field', ...) if you have that helper.
-        // For now, let's just fetch current and update. 
-        // Actually, for simple atomic increments without RPC, we can't easily do "current + 1" in one query with standard client syntax unless we use a custom sql function or raw sql manually?
-        // Supabase client doesn't support "increment" natively in .update().
-        // We will do fetch -> update.
-
+        // 1. Increment used_count
         const { data: currentData, error: fetchError } = await supabase
             .from(table)
-            .select('used_count')
+            .select('used_count, id') // Select ID too just in case
             .eq('ref_code', code)
             .single();
 
@@ -107,7 +101,18 @@ router.post('/track', async (req, res) => {
 
         if (updateError) throw updateError;
 
-        res.json({ success: true });
+        // 2. [NEW] Grant Role if applicable (Family/Team/Ambassador)
+        let newRole = null;
+        if (table === 'family_referrals') newRole = 'family';
+        else if (table === 'team_referrals') newRole = 'team';
+        else if (table === 'ambassador_referrals') newRole = 'ambassador';
+
+        if (newRole) {
+            console.log(`[REFERRAL_TRACK] Granting role '${newRole}' to user ${userId}`);
+            await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
+        }
+
+        res.json({ success: true, grantedRole: newRole });
 
     } catch (error) {
         console.error('Tracking Error:', error);

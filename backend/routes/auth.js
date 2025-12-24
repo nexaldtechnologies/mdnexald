@@ -6,15 +6,7 @@ const jwt = require('jsonwebtoken');
 const router = express.Router();
 
 // ---- NODEMAILER CONFIGURATION ----
-const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.example.com',
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: false, // true for 465, false for other ports
-    auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-    },
-});
+const transporter = require('../utils/email');
 
 // ---- MIDDLEWARE ----
 const requireAuth = async (req, res, next) => {
@@ -26,12 +18,28 @@ const requireAuth = async (req, res, next) => {
 
     const token = authHeader.split(' ')[1];
 
-    try {
-        const { data: { user }, error } = await supabase.auth.getUser(token);
+    // [NEW] Static API Token for MDnexa GPT / Service-to-Service
+    if (process.env.MDNEXA_API_TOKEN && token === process.env.MDNEXA_API_TOKEN) {
+        console.log('[AUTH] Valid Static API Token used.');
+        req.user = {
+            id: 'service-account-gpt',
+            email: 'gpt@mdnexa.com',
+            role: 'service_role',
+            app_metadata: { role: 'service_role' },
+            user_metadata: { role: 'service_role', professional_role: 'AI Assistant' }
+        };
+        return next();
+    }
 
-        if (error || !user) {
+    try {
+        const { data, error } = await supabase.auth.getUser(token);
+
+        if (error || !data || !data.user) {
+            if (!data) console.error('[AUTH_ERROR] Supabase returned NULL data. Key missing?');
             return res.status(401).json({ error: 'Invalid token' });
         }
+
+        const { user } = data;
 
         req.user = user;
         next();
@@ -212,7 +220,7 @@ router.post('/request-password-reset', async (req, res) => {
 
         // 3. Send Email
         const mailOptions = {
-            from: process.env.SMTP_USER,
+            from: process.env.MAIL_FROM || '"MDnexa Support" <noreply@mdnexa.com>',
             to: email,
             subject: 'Reset Your Password - MDnexa',
             html: `
@@ -226,6 +234,12 @@ router.post('/request-password-reset', async (req, res) => {
                 </div>
             `
         };
+
+        console.log('[PW_RESET_DEBUG] Attempting to send email:', {
+            from: mailOptions.from,
+            to: mailOptions.to,
+            smtpUser: process.env.SMTP_USER ? '***' : 'MISSING'
+        });
 
         const info = await transporter.sendMail(mailOptions);
         console.log('[PW_RESET_API] Email sent:', info.messageId);
@@ -245,7 +259,7 @@ router.post('/debug/send-test-mail', async (req, res) => {
 
     try {
         const info = await transporter.sendMail({
-            from: process.env.SMTP_USER,
+            from: process.env.MAIL_FROM || '"MDnexa Support" <noreply@mdnexa.com>',
             to: req.body.email || process.env.SMTP_USER, // Send to self if not specified
             subject: 'MDnexa Email Test',
             text: 'This is a test email to verify SMTP configuration.',
@@ -299,10 +313,11 @@ router.post('/forgot-password', async (req, res) => {
 
         // 3. Construct Link
         const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+        console.log('[PW_RESET_DEBUG] Generated Link:', resetLink); // DEBUG: Verify URL
 
         // 4. Send Email via SMTP
         await transporter.sendMail({
-            from: process.env.SMTP_USER || 'noreply@mdnexa.com',
+            from: process.env.MAIL_FROM || '"MDnexa Support" <noreply@mdnexa.com>',
             to: email,
             subject: 'Reset your MDnexa password',
             html: `
@@ -319,7 +334,7 @@ router.post('/forgot-password', async (req, res) => {
         res.json({ success: true, message: 'RESET LINK SENT (DEBUG MODE) - Check Email Now' });
     } catch (error) {
         console.error('Forgot password error:', error);
-        res.status(500).json({ error: 'Failed to process request' });
+        res.status(500).json({ error: `Failed to process request: ${error.message}` });
     }
 });
 

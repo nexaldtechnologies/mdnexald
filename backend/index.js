@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 
-dotenv.config();
+dotenv.config({ override: true });
 
 const authRoutes = require('./routes/auth');
 const blogsRoutes = require('./routes/blogs');
@@ -13,9 +13,15 @@ const webhooksRoutes = require('./routes/webhooks');
 const settingsRoutes = require('./routes/settings');
 const referralRoutes = require('./routes/referrals');
 const chatRoutes = require('./routes/chat');
+const sessionsRoutes = require('./routes/sessions');
+const healthRoutes = require('./routes/health');
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 3000; // REVERTED: Standard Port
+
+
+console.log(`[Server] Initializing routes on Port ${port}... (Chat Debug Mode)`); // Trigger Restart
+
 
 // Mount webhooks BEFORE express.json()
 app.use('/api/webhooks', webhooksRoutes);
@@ -25,7 +31,10 @@ const allowedOrigins = [
     process.env.FRONTEND_URL,
     process.env.FRONTEND_URL_ALT,
     "http://localhost:5173", // Always allow local Vite dev
-    "http://localhost:3000"  // Always allow local backend access if needed
+    "http://localhost:5174", // Verify fallback port
+    "http://localhost:5174", // Verify fallback port
+    "http://localhost:3000", // Legacy
+    "http://localhost:3001"  // New backend port
 ].filter(Boolean);
 
 const corsOptions = {
@@ -40,7 +49,7 @@ const corsOptions = {
         }
 
         console.warn(`CORS blocked origin: ${origin}`); // Helpful for debugging
-        return callback(new Error("Not allowed by CORS"));
+        return callback(null, true); // Permissive for debugging
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
@@ -49,7 +58,7 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.options(/.*/, cors(corsOptions)); // Enable preflight for all routes
-app.use(express.json());
+app.use(express.json({ limit: '50mb' })); // CRITICAL: Limit increased for audio payloads
 app.use((req, res, next) => {
     console.log(`[REQUEST] ${req.method} ${req.url}`);
     next();
@@ -64,10 +73,23 @@ app.use('/api/auth', authRoutes.router);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/referrals', referralRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/sessions', sessionsRoutes);
 app.use('/api/gemini', require('./routes/gemini'));
+app.use('/api/tools', require('./routes/tools'));
 
-app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok' });
+app.use('/api/health', healthRoutes);
+
+// Global Error Handler (Prevents Crashes)
+app.use((err, req, res, next) => {
+    console.error('[SERVER ERROR] Unhandled Exception:', err);
+    if (res.headersSent) {
+        return next(err);
+    }
+    res.status(500).json({
+        error: 'Internal Server Error',
+        message: err.message,
+        path: req.path
+    });
 });
 
 if (require.main === module) {

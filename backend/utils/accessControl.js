@@ -1,18 +1,48 @@
 const hasUnlimitedAccess = (user) => {
     if (!user) return false;
 
-    // Roles that always have unlimited access
-    const privilegedRoles = ['admin', 'team', 'friend', 'family', 'ambassador'];
-    // Normalize role to lowercase just in case
-    const userRole = (user.role || 'user').toLowerCase();
+    // Normalize roles
+    // We expect user.roles to be an array if populated by the caller, otherwise we gather standard locations
+    let gatheredRoles = Array.isArray(user.roles) ? user.roles : [];
 
-    if (privilegedRoles.includes(userRole)) return true;
+    gatheredRoles.push(user.role);
+    if (user.app_metadata) gatheredRoles.push(user.app_metadata.role);
+    if (user.user_metadata) gatheredRoles.push(user.user_metadata.role);
+    if (user.app_metadata) gatheredRoles.push(user.app_metadata.role);
+    if (user.user_metadata) gatheredRoles.push(user.user_metadata.role);
+    // REMOVED professional_role from privilege check to enforce strict separation
 
-    // Users with lifetime access
-    if (user.has_lifetime_access === true) return true;
+    // Flatten and clean
+    const roles = gatheredRoles
+        .flat()
+        .filter(Boolean)
+        .map(r => String(r).toLowerCase());
 
-    // Active subscribers
-    if (user.subscription_status === 'active' || user.subscription_status === 'trial') return true;
+    console.log("Checking Access for Roles:", roles);
+
+    // 1. HARDCODED PRIVILEGED ROLES (Never get limits)
+    const privilegedRoles = [
+        'admin', 'superuser', 'owner',
+        'team', 'developer', 'support',
+        'friend', 'friends', 'family',
+        'friends_and_family', 'family_and_friends',
+        'ambassador', 'ambassadors', 'ambassasors',
+        'partner', 'vip',
+        'user_verified_freetrial', 'user_verified_paid'
+    ];
+
+    if (roles.some(r => privilegedRoles.includes(r))) return true;
+
+    // 2. LIFETIME & PAIDS
+    if (user.has_lifetime_access === true || user.plan === 'lifetime') return true;
+
+    // 3. SUBSCRIPTION STATUS
+    const validStatuses = ['active', 'trial', 'past_due']; // Be generous with past_due
+    if (validStatuses.includes(user.subscription_status)) return true;
+
+    // 4. PLAN CHECK (Standard/Pro/Enterprise)
+    const paidPlans = ['pro', 'premium', 'enterprise', 'standard'];
+    if (paidPlans.includes(user.plan_id) || paidPlans.includes(user.price_id)) return true;
 
     return false;
 };

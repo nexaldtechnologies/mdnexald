@@ -1,5 +1,9 @@
 const express = require('express');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const stripeKey = process.env.STRIPE_SECRET_KEY;
+if (!stripeKey) console.error('[STRIPE_ERROR] Missing STRIPE_SECRET_KEY');
+else console.log('[STRIPE_DEBUG] Initialized with key length:', stripeKey.length);
+
+const stripe = require('stripe')(stripeKey);
 const supabase = require('../utils/supabase');
 const { requireAuth } = require('./auth');
 
@@ -102,20 +106,78 @@ router.get('/status', requireAuth, async (req, res) => {
 // Create Billing Portal Session
 router.post('/create-portal-session', requireAuth, async (req, res) => {
     const userId = req.user.id;
+    const userEmail = req.user.email;
 
     try {
-        const { data: profile } = await supabase
+        // 1. Check Profiles Table
+        let { data: profile } = await supabase
             .from('profiles')
             .select('stripe_customer_id')
             .eq('id', userId)
             .single();
 
-        if (!profile?.stripe_customer_id) {
-            return res.status(400).json({ error: 'No Stripe customer found' });
+        let customerId = profile?.stripe_customer_id;
+
+        // 2. Fallback: Check User Metadata if not in Profile
+        if (!customerId && req.user.user_metadata?.stripe_customer_id) {
+            console.log('[STRIPE_DEBUG] Found Customer ID in user_metadata');
+            customerId = req.user.user_metadata.stripe_customer_id;
         }
 
+        if (!customerId) {
+            console.log('[STRIPE_DEBUG] No Customer ID found. Creating one...');
+            const customer = await stripe.customers.create({
+                email: userEmail,
+                metadata: { userId },
+            });
+            customerId = customer.id;
+
+            // 3. Try Saving to Profiles (Primary Storage)
+            try {
+                // Try Update first
+                const { error: upErr, data: upData } = await supabase
+                    .from('profiles')
+                    .update({ stripe_customer_id: customerId })
+                    .eq('id', userId)
+                    .select();
+
+                // If Update failed (no row), try Insert
+                if (upErr || !upData || upData.length === 0) {
+                    const { error: insErr } = await supabase
+                        .from('profiles')
+                        .insert({ id: userId });
+
+                    if (insErr) throw insErr; // Trigger fallback to catch block
+
+                    // Update again after insert
+                    await supabase
+                        .from('profiles')
+                        .update({ stripe_customer_id: customerId })
+                        .eq('id', userId);
+                }
+            } catch (dbError) {
+                console.warn('[STRIPE_WARN] Failed to save to profiles table, falling back to user_metadata:', dbError.message);
+
+                // 4. Fallback Storage: User Metadata
+                // This bypasses triggers/schema issues in 'profiles' table
+                const { error: authError } = await supabase.auth.admin.updateUserById(userId, {
+                    user_metadata: {
+                        ...req.user.user_metadata,
+                        stripe_customer_id: customerId
+                    }
+                });
+
+                if (authError) {
+                    console.error('[STRIPE_ERROR] Critical: Failed to save to both profiles and metadata:', authError);
+                    throw authError;
+                }
+            }
+        }
+
+        console.log('[STRIPE_DEBUG] Creating portal session for:', customerId);
+
         const session = await stripe.billingPortal.sessions.create({
-            customer: profile.stripe_customer_id,
+            customer: customerId,
             return_url: `${process.env.FRONTEND_URL}/dashboard`,
         });
 

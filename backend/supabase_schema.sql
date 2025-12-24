@@ -6,6 +6,7 @@ create table if not exists profiles (
   logo_url text,
   ref_source text,
   stripe_customer_id text,
+  preferences jsonb default '{}'::jsonb,
   created_at timestamptz default now()
 );
 
